@@ -2,13 +2,13 @@
     --bg: #121212;
     --panel: #1e1e24;
     --border: #333;
-    --accent: #50fa7b; /* Green */
+    --accent: #50fa7b;
     --accent-hover: #40c963;
     --delete: #ff5555;
     --delete-hover: #ff0000;
-    --tag-noise: #bd93f9; /* Purple */
-    --tag-type: #8be9fd; /* Cyan */
-    --tag-name: #ffb86c; /* Orange */
+    --tag-noise: #bd93f9;
+    --tag-type: #8be9fd;
+    --tag-name: #ffb86c;
     --text: #f8f8f2;
     --text-mute: #8b9bb4;
     --error: #ff5555;
@@ -27,7 +27,6 @@ body {
     overflow: hidden;
 }
 
-/* LAYOUT */
 #app-container {
     display: flex;
     flex-direction: column;
@@ -36,7 +35,6 @@ body {
     position: relative;
 }
 
-/* CANVAS AREA */
 #viewport {
     flex: 1;
     position: relative;
@@ -45,7 +43,6 @@ body {
     cursor: move;
 }
 
-/* OVERLAY CONTROLS */
 .overlay-controls {
     position: absolute;
     top: 20px;
@@ -81,7 +78,6 @@ body {
     color: #000;
 }
 
-/* ZOOM SLIDER */
 .zoom-container {
     position: absolute;
     right: 20px;
@@ -106,15 +102,14 @@ body {
 }
 
 input[type=range][orient=vertical] {
-    writing-mode: bt-lr; /* IE */
-    -webkit-appearance: slider-vertical; /* WebKit */
+    writing-mode: bt-lr; 
+    -webkit-appearance: slider-vertical;
     width: 8px;
     height: 150px;
     padding: 0 5px;
     accent-color: var(--accent);
 }
 
-/* BOTTOM CONTROL BAR */
 #controls {
     height: auto;
     min-height: 180px;
@@ -223,7 +218,6 @@ button:active { transform: scale(0.98); }
 .btn-secondary { background: #383a59; color: var(--text); flex: 1; }
 .btn-secondary:hover { background: #44475a; }
 
-/* SIDEBAR */
 #sidebar {
     position: absolute;
     top: 0; left: 0; bottom: 0;
@@ -332,7 +326,6 @@ button:active { transform: scale(0.98); }
     font-size: 0.7rem;
 }
 
-/* TOAST */
 #toast {
     position: absolute;
     bottom: 200px; left: 50%;
