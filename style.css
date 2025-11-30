@@ -38,7 +38,6 @@ body {
 #viewport {
     flex: 1;
     position: relative;
-    /* Clean Blue Sky for Isometric look */
     background: #87CEEB; 
     overflow: hidden;
     cursor: move;
