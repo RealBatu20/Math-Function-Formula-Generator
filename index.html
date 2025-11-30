@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Voxel Math Gen - Isometric Infinite</title>
+    <title>Voxel Math Gen - Isometric Fixed</title>
     <link rel="stylesheet" href="style.css">
     <script type="importmap">
         {
@@ -30,7 +30,6 @@
             <!-- Zoom Slider -->
             <div class="zoom-container">
                 <label for="zoom-slider">+</label>
-                <!-- Zoom for Orthographic: High value = Close, Low value = Far -->
                 <input type="range" id="zoom-slider" min="5" max="100" value="40" orient="vertical">
                 <label for="zoom-slider">-</label>
             </div>
@@ -42,10 +41,10 @@
             <div class="bar-header">
                 <div class="tags-container">
                     <span id="tag-noise" class="info-tag">SYSTEM</span>
-                    <span id="tag-gen" class="info-tag">ISO-MODE</span>
-                    <span id="gen-name" class="gen-name-text">Infinite Map</span>
+                    <span id="tag-gen" class="info-tag">READY</span>
+                    <span id="gen-name" class="gen-name-text">...</span>
                 </div>
-                <span style="font-size:0.7rem; opacity:0.5;">V6.0 ISOMETRIC</span>
+                <span style="font-size:0.7rem; opacity:0.5;">V7.0 STABLE</span>
             </div>
             
             <div class="input-wrapper">
@@ -70,7 +69,9 @@
             </div>
             <button class="close-sidebar" id="close-history">✕</button>
         </div>
-        <div id="sidebar-content"></div>
+        <div id="sidebar-content">
+            <!-- Content Injected via JS -->
+        </div>
     </aside>
 
     <script type="module" src="script.js"></script>
