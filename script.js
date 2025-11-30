@@ -48,20 +48,15 @@ const Noise = {
 Noise.seed();
 
 // Helper for deterministic random based on coordinates
-// This ensures that "rand()" in the formula returns the same value for the same block location
 const Hash = {
     fract: x => x - Math.floor(x),
-    // Standard GLSL hash
     val: (x, z) => {
         return Hash.fract(Math.sin(x * 12.9898 + z * 78.233) * 43758.5453);
     }
 }
 
-// FULL CONTEXT WITH ALL VALID FUNCTIONS
 const Ctx = {
-    // Current Coordinate Context (Updated by Loop)
     _x: 0, _z: 0,
-
     // CONSTANTS
     pi: Math.PI, 'π': Math.PI,
     e: Math.E,
@@ -115,10 +110,8 @@ const Ctx = {
     beta: (x, y) => Ctx.gamma(x) * Ctx.gamma(y) / Ctx.gamma(x + y),
 
     // RANDOM (DETERMINISTIC)
-    // Uses Ctx._x and Ctx._z to ensure the same coordinate always gets the same random number
     rand: () => Hash.val(Ctx._x, Ctx._z),
     randnormal: (mean, stdev) => {
-        // Box-Muller with deterministic seeds
         let u = Hash.val(Ctx._x * 1.5, Ctx._z * 1.5);
         let v = Hash.val(Ctx._x * 2.5, Ctx._z * 2.5);
         if(u<=0) u=0.0001;
@@ -170,7 +163,6 @@ class RandomFormula {
     pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
     
     getScale() {
-        // Generates random coordinate scaling like x*0.1 or z*0.05
         const val = Math.random();
         if(val < 0.3) return (Math.random()*0.05 + 0.01).toFixed(4); 
         if(val < 0.7) return (Math.random()*0.2 + 0.05).toFixed(3); 
@@ -244,14 +236,13 @@ const Generator = new RandomFormula();
 const Categories = ['HARDCODED', 'INTERMEDIATE', 'EXPERT', 'UNREAL', 'LONG MATH'];
 
 // ==========================================
-// 3. THREE.JS SCENE & INFINITE LOGIC
+// 3. THREE.JS SCENE & 100K WORLD LOGIC
 // ==========================================
 
 const container = document.getElementById('viewport');
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
-// Fog hides the chunk boundaries
-scene.fog = new THREE.Fog(0x87CEEB, 60, 140);
+scene.fog = new THREE.Fog(0x87CEEB, 60, 160);
 
 const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 1, 1000);
 const INITIAL_CAM_POS = { x: 50, y: 50, z: 50 };
@@ -289,8 +280,10 @@ dirLight.shadow.camera.top = 100;
 dirLight.shadow.camera.bottom = -100;
 scene.add(dirLight);
 
-// INFINITE VOXEL SYSTEM
-const GRID = 90; // Render distance (blocks)
+// WORLD SETTINGS
+const WORLD_SIZE = 100000;
+const WORLD_HALF = WORLD_SIZE / 2;
+const GRID = 100; // Increased render distance for larger feel
 const LAYERS = 4;
 const TOTAL_INSTANCES = GRID * GRID * LAYERS;
 
@@ -304,8 +297,7 @@ const material = new THREE.MeshStandardMaterial({
 const instMesh = new THREE.InstancedMesh(geometry, material, TOTAL_INSTANCES);
 instMesh.castShadow = true;
 instMesh.receiveShadow = true;
-
-// CRITICAL FIX: Disable frustum culling so the mesh doesn't disappear when the camera moves far away
+// Infinite scrolling requires disabling frustum culling to prevent pop-in/out
 instMesh.frustumCulled = false; 
 
 scene.add(instMesh);
@@ -332,6 +324,8 @@ let lastCamX = -99999;
 let lastCamZ = -99999;
 
 const errorMsg = document.getElementById('error-msg');
+const coordDisplay = document.getElementById('coords');
+
 function setError(msg) {
     if(msg) {
         errorMsg.textContent = "⚠ " + msg;
@@ -345,13 +339,11 @@ function setError(msg) {
 function compileFormula(str) {
     try {
         let safeStr = str.replace(/\^/g, '**');
-        // We create a function that takes our Context and coordinates
         const f = new Function('C', 'x', 'z', `
             with(C) { 
                 return ${safeStr}; 
             }
         `);
-        // Test it
         Ctx._x = 0; Ctx._z = 0;
         f(Ctx, 0, 0);
         setError(null);
@@ -368,14 +360,16 @@ function updateInfiniteTerrain() {
     // Grid center based on camera
     const cx = Math.floor(camera.position.x);
     const cz = Math.floor(camera.position.z);
+    
+    // Update Coord UI
+    coordDisplay.textContent = `X: ${cx.toLocaleString()} | Z: ${cz.toLocaleString()}`;
 
-    // Only update if moved 
     if (Math.abs(cx - lastCamX) < 1 && Math.abs(cz - lastCamZ) < 1) return;
     
     lastCamX = cx;
     lastCamZ = cz;
     
-    // Move light with camera to maintain shadows
+    // Move light with camera
     dirLight.position.set(cx + 50, 100, cz + 50);
     dirLight.target.position.set(cx, 0, cz);
     dirLight.target.updateMatrixWorld();
@@ -385,11 +379,20 @@ function updateInfiniteTerrain() {
     
     for(let i = 0; i < GRID; i++) {
         for(let j = 0; j < GRID; j++) {
-            // World Coordinates
             const wx = cx - half + i;
             const wz = cz - half + j;
             
-            // Set Context Coordinates for deterministic randomness
+            // WORLD BORDER LOGIC (100k x 100k)
+            if (Math.abs(wx) > WORLD_HALF || Math.abs(wz) > WORLD_HALF) {
+                // Render nothing (void) outside border
+                for(let k=0; k<LAYERS; k++) {
+                    dummy.scale.set(0,0,0);
+                    dummy.updateMatrix();
+                    instMesh.setMatrixAt(idx++, dummy.matrix);
+                }
+                continue;
+            }
+
             Ctx._x = wx;
             Ctx._z = wz;
 
@@ -401,7 +404,6 @@ function updateInfiniteTerrain() {
 
             const surfaceY = Math.floor(y);
             
-            // Biome logic
             let biomeType = 'GRASS';
             if (surfaceY < -2) biomeType = 'WATER';
             else if (surfaceY < 2) biomeType = 'SAND';
@@ -417,6 +419,7 @@ function updateInfiniteTerrain() {
                 const currentY = surfaceY - d;
                 
                 dummy.position.set(wx, currentY, wz);
+                dummy.scale.set(1, 1, 1);
                 dummy.updateMatrix();
                 instMesh.setMatrixAt(idx, dummy.matrix);
 
@@ -456,7 +459,7 @@ function updateTerrain(funcStr) {
     const f = compileFormula(funcStr);
     if(f) {
         compiledFunc = f;
-        lastCamX = -99999; // Force redraw
+        lastCamX = -99999;
         updateInfiniteTerrain();
     }
 }
