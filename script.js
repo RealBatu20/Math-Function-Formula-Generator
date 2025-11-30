@@ -19,7 +19,6 @@ const Noise = {
     grad3: [[1,1,0],[-1,1,0],[1,-1,0],[-1,-1,0],[1,0,1],[-1,0,1],[1,0,-1],[-1,0,-1],[0,1,1],[0,-1,1],[0,1,-1],[0,-1,-1]],
     dot: (g, x, y) => g[0]*x + g[1]*y,
     simplex: function(x, y) {
-        // Deterministic simplex
         const F2 = 0.5*(Math.sqrt(3.0)-1.0);
         const G2 = (3.0-Math.sqrt(3.0))/6.0;
         let n0, n1, n2;
@@ -47,54 +46,40 @@ const Noise = {
 };
 Noise.seed();
 
-// Robust hash for large coordinates (avoids float precision artifacts at 100k)
 const Hash = {
-    // 32-bit integer hash for stability at large coordinates
     intHash: (x, z) => {
         let h = 0x811c9dc5;
-        // Mix X
         h ^= (x & 0xFFFFFFFF);
         h = Math.imul(h, 0x01000193);
-        // Mix Z
         h ^= (z & 0xFFFFFFFF);
         h = Math.imul(h, 0x01000193);
         return (h >>> 0) / 4294967296;
     },
     val: (x, z) => {
-        // Use integer hashing for core randomness to support huge world coords
         const xi = Math.floor(x * 100);
         const zi = Math.floor(z * 100);
         return Hash.intHash(xi, zi);
     }
 }
 
-// CONTEXT
 const Ctx = {
     _x: 0, _z: 0,
     pi: Math.PI, 'π': Math.PI, e: Math.E, phi: 1.61803,
     sin: Math.sin, cos: Math.cos, tan: Math.tan,
     abs: Math.abs, floor: Math.floor, ceil: Math.ceil, round: Math.round,
     sqrt: Math.sqrt, pow: Math.pow,
-    mod: (x, y) => ((x % y) + y) % y, // Correct float modulo
+    mod: (x, y) => ((x % y) + y) % y,
     max: Math.max, min: Math.min,
-    
-    // Extended Math
     csc: x => 1/Math.sin(x), sec: x => 1/Math.cos(x),
     sinh: Math.sinh, cosh: Math.cosh, tanh: Math.tanh,
-    ln: Math.log, lg: Math.log10,
-    exp: Math.exp,
-    
-    // Deterministic Random
+    ln: Math.log, lg: Math.log10, exp: Math.exp,
     rand: () => Hash.intHash(Ctx._x, Ctx._z),
     randnormal: (mean=0, stdev=1) => {
-        // Box-Muller with deterministic seeds
         let u = Hash.intHash(Ctx._x * 167, Ctx._z * 167);
         let v = Hash.intHash(Ctx._x * 253, Ctx._z * 253);
         if(u<=0) u=0.0001;
         return (Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v)) * stdev + mean;
     },
-    
-    // Noise
     simplex: (x,y,z) => Noise.simplex(x,z),
     perlin: (x,y,z) => Noise.simplex(x,z),
     octaved: (x, z, oct, per) => {
@@ -107,15 +92,11 @@ const Ctx = {
     }
 };
 
-// ==========================================
-// 2. RANDOM GENERATOR
-// ==========================================
 const Generator = {
     ops: ['+','-','*'],
     funcs: ['sin','cos','abs','floor'],
     noise: ['simplex','octaved'],
     pick: arr => arr[Math.floor(Math.random()*arr.length)],
-    
     genExpr: function(depth) {
         if(depth <= 0) {
             const r = Math.random();
@@ -137,25 +118,28 @@ const Generator = {
 const Categories = ['HARDCODED', 'INTERMEDIATE', 'EXPERT', 'UNREAL', 'LONG MATH'];
 
 // ==========================================
-// 3. THREE.JS SCENE
+// 3. THREE.JS SCENE (ISOMETRIC SETUP)
 // ==========================================
 
 const container = document.getElementById('viewport');
 const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87CEEB);
+// NO FOG requested
+scene.fog = null; 
 
-// SKY COLOR
-const SKY_COLOR = 0x87CEEB;
-scene.background = new THREE.Color(SKY_COLOR);
+// ORTHOGRAPHIC CAMERA (True Isometric)
+// View size determines how much of the world is seen (Zoom)
+let aspect = container.clientWidth / container.clientHeight;
+let viewSize = 40; // Initial zoom level
+const camera = new THREE.OrthographicCamera(
+    -viewSize * aspect, viewSize * aspect,
+    viewSize, -viewSize,
+    1, 2000 // Huge Far plane for isometric distance
+);
 
-// FOG: Critical for the "Infinite" illusion.
-// Start fog at 60% of view distance, end at 95%.
-// This ensures new chunks appearing at the edge are hidden by fog.
-const VIEW_RADIUS = 120; // Matches GRID radius roughly
-scene.fog = new THREE.Fog(SKY_COLOR, VIEW_RADIUS * 0.5, VIEW_RADIUS * 0.95);
-
-const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
-const INITIAL_CAM_POS = { x: 0, y: 60, z: 60 };
-camera.position.set(INITIAL_CAM_POS.x, INITIAL_CAM_POS.y, INITIAL_CAM_POS.z);
+// Isometric Position: Look from a corner
+camera.position.set(500, 500, 500); 
+camera.lookAt(0, 0, 0);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
 renderer.setSize(container.clientWidth, container.clientHeight);
@@ -166,41 +150,34 @@ container.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; 
 controls.dampingFactor = 0.05;
-controls.enableZoom = true;
-// Zoom managed by slider + scroll
-controls.minDistance = 10;
-controls.maxDistance = 300; 
-controls.rotateSpeed = 0.4;
+controls.enableZoom = true; // We handle zoom manually to sync with UI, or let Orbit handle it
+controls.zoomSpeed = 1.0;
+controls.rotateSpeed = 0.5;
 controls.autoRotate = true;
-controls.autoRotateSpeed = 1.0;
-controls.target.set(0, 0, 0);
+controls.autoRotateSpeed = 1.5;
 
 const ambi = new THREE.AmbientLight(0xffffff, 0.7);
 scene.add(ambi);
 
 const dirLight = new THREE.DirectionalLight(0xffffff, 1.1);
-dirLight.position.set(50, 150, 50);
+dirLight.position.set(200, 400, 200);
 dirLight.castShadow = true;
-dirLight.shadow.mapSize.width = 2048;
-dirLight.shadow.mapSize.height = 2048;
-// Huge shadow camera to cover the whole visible area
-const d = 150; 
+dirLight.shadow.mapSize.width = 4096; // High Res Shadows
+dirLight.shadow.mapSize.height = 4096;
+const d = 300; 
 dirLight.shadow.camera.left = -d;
 dirLight.shadow.camera.right = d;
 dirLight.shadow.camera.top = d;
 dirLight.shadow.camera.bottom = -d;
-dirLight.shadow.camera.far = 300;
-dirLight.shadow.bias = -0.0005;
+dirLight.shadow.camera.far = 1000;
 scene.add(dirLight);
 
 // ==========================================
-// 4. INFINITE VOXEL SYSTEM (OPTIMIZED)
+// 4. INFINITE VOXEL SYSTEM
 // ==========================================
 
-// Increased GRID size for "Full Map" feel
-// 160x160 blocks = 25,600 columns * 4 layers = ~100k instances.
-// This is heavy but manageable on modern devices for InstancedMesh.
-const GRID = 160; 
+// 200x200 Grid (40,000 blocks per layer)
+const GRID = 200; 
 const LAYERS = 4;
 const TOTAL_INSTANCES = GRID * GRID * LAYERS;
 
@@ -214,8 +191,7 @@ const material = new THREE.MeshStandardMaterial({
 const instMesh = new THREE.InstancedMesh(geometry, material, TOTAL_INSTANCES);
 instMesh.castShadow = true;
 instMesh.receiveShadow = true;
-// CRITICAL: Disable frustum culling to prevent flickering when bounds aren't updated perfectly
-instMesh.frustumCulled = false; 
+instMesh.frustumCulled = false; // Always render
 scene.add(instMesh);
 
 const dummy = new THREE.Object3D();
@@ -232,8 +208,7 @@ const colors = {
     neon: new THREE.Color(0x00e5ff)
 };
 
-// State
-let currentFormula = "sin(x*0.1)*cos(z*0.1)*10";
+let currentFormula = "";
 let compiledFunc = null;
 let lastUpdateX = -999999;
 let lastUpdateZ = -999999;
@@ -242,13 +217,12 @@ function compileFormula(str) {
     try {
         let safeStr = str.replace(/\^/g, '**');
         const f = new Function('C', 'x', 'z', `with(C){return ${safeStr};}`);
-        f(Ctx, 0, 0); // test
+        f(Ctx, 0, 0); 
         document.getElementById('error-msg').classList.add('error-hidden');
         return f;
     } catch(e) {
-        const err = document.getElementById('error-msg');
-        err.textContent = "⚠ " + e.message;
-        err.classList.remove('error-hidden');
+        document.getElementById('error-msg').textContent = "⚠ " + e.message;
+        document.getElementById('error-msg').classList.remove('error-hidden');
         return null;
     }
 }
@@ -256,43 +230,34 @@ function compileFormula(str) {
 function updateTerrain(force = false) {
     if(!compiledFunc) return;
 
-    // Center grid on controls target for smoother rotation, OR camera position?
-    // For infinite feel, we center on the CAMERA's horizontal position.
-    const cx = Math.floor(camera.position.x);
-    const cz = Math.floor(camera.position.z);
+    // Use controls target (Where camera is looking) as the center
+    const cx = Math.floor(controls.target.x);
+    const cz = Math.floor(controls.target.z);
 
-    // Threshold: Only update if moved more than 2 blocks to save CPU
     if (!force && Math.abs(cx - lastUpdateX) < 2 && Math.abs(cz - lastUpdateZ) < 2) return;
-    
     lastUpdateX = cx;
     lastUpdateZ = cz;
     
-    // Move light to keep shadows sharp around player
-    dirLight.position.set(cx + 50, 150, cz + 50);
+    // Light follows center to ensure shadows exist everywhere
+    dirLight.position.set(cx + 200, 400, cz + 200);
     dirLight.target.position.set(cx, 0, cz);
     dirLight.target.updateMatrixWorld();
 
     let idx = 0;
     const offset = Math.floor(GRID / 2);
     
-    // Loop around center
     for(let i = 0; i < GRID; i++) {
         for(let j = 0; j < GRID; j++) {
-            // Calculate world X/Z
             const wx = cx - offset + i;
             const wz = cz - offset + j;
             
-            Ctx._x = wx; Ctx._z = wz; // Set context for randoms
+            Ctx._x = wx; Ctx._z = wz;
 
             let y = 0;
-            try { 
-                y = compiledFunc(Ctx, wx, wz); 
-                if(!Number.isFinite(y)) y = 0;
-            } catch(e) { y = 0; }
-
+            try { y = compiledFunc(Ctx, wx, wz); } catch(e) { y = 0; }
+            if(!Number.isFinite(y)) y = 0;
             const surfaceY = Math.floor(y);
             
-            // Biome determination
             let biome = 'GRASS';
             if (surfaceY < -2) biome = 'WATER';
             else if (surfaceY < 2) biome = 'SAND';
@@ -303,13 +268,11 @@ function updateTerrain(force = false) {
             if(y > 60) biome = 'ALIEN';
             if(y < -30) biome = 'LAVA';
 
-            // Stack blocks downward
             for (let d = 0; d < LAYERS; d++) {
                 dummy.position.set(wx, surfaceY - d, wz);
                 dummy.updateMatrix();
                 instMesh.setMatrixAt(idx, dummy.matrix);
 
-                // Color Logic
                 let c = color;
                 if(d === 0) {
                     if(biome==='WATER') c.copy(colors.water);
@@ -322,16 +285,12 @@ function updateTerrain(force = false) {
                 } else {
                     c.copy(biome==='GRASS'?colors.dirt:colors.stone);
                 }
-                
-                // Darken lower layers for fake AO
                 if(d>0) c.multiplyScalar(0.85);
-
                 instMesh.setColorAt(idx, c);
                 idx++;
             }
         }
     }
-    
     instMesh.instanceMatrix.needsUpdate = true;
     instMesh.instanceColor.needsUpdate = true;
 }
@@ -344,66 +303,32 @@ const ui = {
     input: document.getElementById('formula-input'),
     btnGen: document.getElementById('gen-btn'),
     zoomSlider: document.getElementById('zoom-slider'),
-    // ... other UI refs
 };
 
-// Zoom Slider Logic - Two Way Binding
-let isUserInteractingWithSlider = false;
-
-ui.zoomSlider.addEventListener('mousedown', () => isUserInteractingWithSlider = true);
-ui.zoomSlider.addEventListener('mouseup', () => isUserInteractingWithSlider = false);
-ui.zoomSlider.addEventListener('touchstart', () => isUserInteractingWithSlider = true);
-ui.zoomSlider.addEventListener('touchend', () => isUserInteractingWithSlider = false);
-
+// Update Orthographic Zoom
+// Slider Value: 5 (Far) to 100 (Close)
 ui.zoomSlider.addEventListener('input', () => {
-    // Slider Value: 10 (Close) to 300 (Far)
-    // We want Up (+) to be Close (Zoom In), Down (-) to be Far (Zoom Out)
-    // HTML Slider: Min=10 (Bottom), Max=300 (Top)
-    // Logic: Value = Distance. 
-    // Wait, usually "Zoom In" means value goes UP?
-    // Let's make: Top of slider (Max) = Close Distance (10). Bottom (Min) = Far (300).
-    // So we invert the mapping.
+    const zoomVal = parseInt(ui.zoomSlider.value);
     
-    const sliderVal = parseInt(ui.zoomSlider.value); // 10 to 300
-    // Invert: 
-    // Slider Top (300) -> Distance 10
-    // Slider Bottom (10) -> Distance 300
-    // map: dist = 310 - sliderVal
-    const targetDist = 310 - sliderVal;
+    // In Orthographic, lower Zoom number = Farther away (sees more world)
+    // But typical Zoom Logic is Higher = Closer.
+    // Let's use camera.zoom property directly
+    // Slider 5 -> Zoom 0.2 (Far)
+    // Slider 100 -> Zoom 3.0 (Close)
     
-    // Dolly logic
-    const currentDist = controls.getDistance();
-    const scale = targetDist / currentDist;
-    
-    // Move camera towards/away from target
-    const v = new THREE.Vector3().subVectors(camera.position, controls.target);
-    v.multiplyScalar(scale);
-    camera.position.copy(controls.target).add(v);
-    controls.update();
+    // Mapping:
+    const newZoom = zoomVal / 20; // 0.25 to 5.0
+    camera.zoom = newZoom;
+    camera.updateProjectionMatrix();
 });
 
-// Animation Loop
-function animate() {
-    requestAnimationFrame(animate);
-    
-    controls.update();
-    
-    // Sync slider with actual zoom if user used scroll wheel
-    if(!isUserInteractingWithSlider) {
-        const d = controls.getDistance();
-        // Reverse map: sliderVal = 310 - dist
-        // Clamp for safety
-        const val = Math.max(10, Math.min(300, 310 - d));
-        ui.zoomSlider.value = val;
-    }
+// Sync slider if OrbitControls changes zoom via scroll
+controls.addEventListener('change', () => {
+    const val = Math.min(100, Math.max(5, camera.zoom * 20));
+    ui.zoomSlider.value = val;
+    updateTerrain(); // Update terrain as we move
+});
 
-    // Infinite Terrain Update
-    updateTerrain();
-    
-    renderer.render(scene, camera);
-}
-
-// Init Setup
 function initGen() {
     const type = Generator.pick(Categories);
     const formula = Generator.create(type);
@@ -413,13 +338,12 @@ function initGen() {
     
     document.getElementById('tag-gen').textContent = type;
     document.getElementById('tag-noise').textContent = 'RND';
-    document.getElementById('gen-name').textContent = 'Infinite Realm';
+    document.getElementById('gen-name').textContent = 'Isometric Map';
 }
 
-// UI Listeners
 ui.btnGen.addEventListener('click', () => {
     initGen();
-    Noise.seed(); // New seed
+    Noise.seed();
 });
 
 ui.input.addEventListener('input', () => {
@@ -428,9 +352,13 @@ ui.input.addEventListener('input', () => {
 });
 
 document.getElementById('reset-cam').addEventListener('click', () => {
-    camera.position.set(0, 60, 60);
-    controls.target.set(0, 0, 0);
+    controls.target.set(0, 0, 0); // Center at world origin
+    camera.position.set(500, 500, 500); // Reset Angle
+    camera.zoom = 1;
+    camera.updateProjectionMatrix();
     controls.update();
+    ui.zoomSlider.value = 20;
+    updateTerrain(true);
 });
 
 document.getElementById('toggle-rotate').addEventListener('click', (e) => {
@@ -438,14 +366,17 @@ document.getElementById('toggle-rotate').addEventListener('click', (e) => {
     e.currentTarget.classList.toggle('active');
 });
 
-// Resize
 window.addEventListener('resize', () => {
-    camera.aspect = container.clientWidth / container.clientHeight;
+    aspect = container.clientWidth / container.clientHeight;
+    camera.left = -viewSize * aspect;
+    camera.right = viewSize * aspect;
+    camera.top = viewSize;
+    camera.bottom = -viewSize;
     camera.updateProjectionMatrix();
     renderer.setSize(container.clientWidth, container.clientHeight);
 });
 
-// Sidebar Logic (Simplified for brevity, same as before)
+// Sidebar Logic
 document.getElementById('history-btn').addEventListener('click', () => document.getElementById('sidebar').classList.add('open'));
 document.getElementById('close-history').addEventListener('click', () => document.getElementById('sidebar').classList.remove('open'));
 document.getElementById('copy-btn').addEventListener('click', () => {
@@ -456,4 +387,9 @@ document.getElementById('copy-btn').addEventListener('click', () => {
 });
 
 initGen();
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+}
 animate();
