@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ultimate Voxel Math Gen - Infinite Edition</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- THREE.JS IMPORT MAP -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="app-container">
+        <div id="viewport">
+            <!-- Overlay Controls -->
+            <div class="overlay-controls">
+                <button id="reset-cam" class="overlay-btn">
+                    ⟲ RESET
+                </button>
+                <button id="toggle-rotate" class="overlay-btn active">
+                    <span>↻</span> AUTO ROTATE
+                </button>
+            </div>
+
+            <!-- Zoom Slider (Center Right) -->
+            <div class="zoom-container">
+                <label for="zoom-slider">+</label>
+                <input type="range" id="zoom-slider" min="0" max="100" value="50" orient="vertical">
+                <label for="zoom-slider">-</label>
+            </div>
+
+            <!-- Toast Notification -->
+            <div id="toast">COPIED</div>
+        </div>
+
+        <div id="controls">
+            <div class="bar-header">
+                <div class="tags-container">
+                    <span id="tag-noise" class="info-tag">SYSTEM</span>
+                    <span id="tag-gen" class="info-tag">READY</span>
+                    <span id="gen-name" class="gen-name-text">Welcome</span>
+                </div>
+                <span style="font-size:0.7rem; opacity:0.5;">MATH GEN V4.0 INFINITE</span>
+            </div>
+            
+            <div class="input-wrapper">
+                <textarea id="formula-input" spellcheck="false" placeholder="Click GENERATE or type math formula..."></textarea>
+                <div id="error-msg" class="error-hidden"></div>
+            </div>
+
+            <div class="btn-row">
+                <button class="btn-secondary" id="history-btn">History / Saved</button>
+                <button class="btn-secondary" id="copy-btn">Copy</button>
+                <button class="btn-secondary" id="save-btn">Save</button>
+                <button class="btn-primary" id="gen-btn">GENERATE NEW</button>
+            </div>
+        </div>
+    </div>
+
+    <aside id="sidebar">
+        <div class="sidebar-header">
+            <div class="tab-buttons">
+                <button id="tab-history" class="tab-btn active">HISTORY</button>
+                <button id="tab-saved" class="tab-btn">CUSTOM SAVED</button>
+            </div>
+            <button class="close-sidebar" id="close-history">✕</button>
+        </div>
+        <div id="sidebar-content">
+            <!-- Lists will be injected here -->
+        </div>
+    </aside>
+
+    <script type="module" src="script.js"></script>
+</body>
+</html>
