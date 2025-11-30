@@ -19,6 +19,10 @@
     <div id="app-container">
         <div id="viewport">
             <div class="overlay-controls">
+                <!-- New Realistic Toggle -->
+                <button id="toggle-realistic" class="overlay-btn">
+                    <span>🌿</span> REALISTIC: OFF
+                </button>
                 <button id="reset-cam" class="overlay-btn">
                     ⟲ CENTER
                 </button>
@@ -43,7 +47,7 @@
                     <span id="tag-gen" class="info-tag">READY</span>
                     <span id="gen-name" class="gen-name-text">...</span>
                 </div>
-                <span style="font-size:0.7rem; opacity:0.5;">V8.0 ULTIMATE</span>
+                <span style="font-size:0.7rem; opacity:0.5;">V9.0 REALISM</span>
             </div>
             
             <div class="input-wrapper">
@@ -68,9 +72,7 @@
             </div>
             <button class="close-sidebar" id="close-history">✕</button>
         </div>
-        <div id="sidebar-content">
-            <!-- Content Injected via JS -->
-        </div>
+        <div id="sidebar-content"></div>
     </aside>
 
     <script type="module" src="script.js"></script>
