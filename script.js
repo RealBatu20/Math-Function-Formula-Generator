@@ -19,6 +19,7 @@ const Noise = {
     grad3: [[1,1,0],[-1,1,0],[1,-1,0],[-1,-1,0],[1,0,1],[-1,0,1],[1,0,-1],[-1,0,-1],[0,1,1],[0,-1,1],[0,1,-1],[0,-1,-1]],
     dot: (g, x, y) => g[0]*x + g[1]*y,
     simplex: function(x, y) {
+        // Deterministic simplex based on permutation table
         const F2 = 0.5*(Math.sqrt(3.0)-1.0);
         const G2 = (3.0-Math.sqrt(3.0))/6.0;
         let n0, n1, n2;
@@ -46,8 +47,21 @@ const Noise = {
 };
 Noise.seed();
 
+// Helper for deterministic random based on coordinates
+// This ensures that "rand()" in the formula returns the same value for the same block location
+const Hash = {
+    fract: x => x - Math.floor(x),
+    // Standard GLSL hash
+    val: (x, z) => {
+        return Hash.fract(Math.sin(x * 12.9898 + z * 78.233) * 43758.5453);
+    }
+}
+
 // FULL CONTEXT WITH ALL VALID FUNCTIONS
 const Ctx = {
+    // Current Coordinate Context (Updated by Loop)
+    _x: 0, _z: 0,
+
     // CONSTANTS
     pi: Math.PI, 'π': Math.PI,
     e: Math.E,
@@ -83,7 +97,7 @@ const Ctx = {
     mod: (x, y) => x % y,
     gcd: (x, y) => { x = Math.abs(x); y = Math.abs(y); while(y){var t=y; y=x%y; x=t;} return x; },
     lcm: (x, y) => (!x||!y) ? 0 : Math.abs((x*y)/Ctx.gcd(x,y)),
-    modi: (x, m) => (1/x)%m, // Approximation for float
+    modi: (x, m) => (1/x)%m,
 
     // SPECIAL
     gamma: (z) => { 
@@ -100,13 +114,17 @@ const Ctx = {
     },
     beta: (x, y) => Ctx.gamma(x) * Ctx.gamma(y) / Ctx.gamma(x + y),
 
-    // RANDOM
-    rand: Math.random,
+    // RANDOM (DETERMINISTIC)
+    // Uses Ctx._x and Ctx._z to ensure the same coordinate always gets the same random number
+    rand: () => Hash.val(Ctx._x, Ctx._z),
     randnormal: (mean, stdev) => {
-        let u=0, v=0; while(u===0) u=Math.random(); while(v===0) v=Math.random();
+        // Box-Muller with deterministic seeds
+        let u = Hash.val(Ctx._x * 1.5, Ctx._z * 1.5);
+        let v = Hash.val(Ctx._x * 2.5, Ctx._z * 2.5);
+        if(u<=0) u=0.0001;
         return (Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v)) * (stdev||1) + (mean||0);
     },
-    randrange: (min, max) => Math.random() * (max - min) + min,
+    randrange: (min, max) => Hash.val(Ctx._x, Ctx._z) * (max - min) + min,
 
     // NOISE
     perlin: (x, y, z) => Noise.simplex(x, z), 
@@ -129,40 +147,34 @@ const Ctx = {
 };
 
 // ==========================================
-// 2. ADVANCED RANDOM GENERATION LOGIC
+// 2. RANDOM FORMULA GENERATOR
 // ==========================================
 
 const GenOps = {
-    unary: ['sin','cos','tan','csc','sec','cot','sinh','cosh','tanh','abs','floor','ceil','round','sqrt','cbrt','ln','lg','exp','sigmoid','erf','gamma','sign'],
-    binary: ['pow','mod','max','min','atan2','root','log','hypot'],
-    noise: ['perlin','simplex','blended','octaved'],
-    ops: ['+','-','*','/','^'],
+    unary: ['sin','cos','tan','abs','floor','ceil','round','sqrt','ln','sigmoid','sign'],
+    binary: ['pow','mod','max','min','root'],
+    noise: ['perlin','simplex','octaved'],
+    ops: ['+','-','*','/'],
     vars: ['x','z'],
-    consts: ['pi','e','phi','zeta3','catalan','alpha','delta','omega']
+    consts: ['pi','e']
 };
 
 const NameGen = {
-    adj: ['Cosmic','Quantum','Voxel','Hyper','Cyber','Glitch','Floating','Lost','Neon','Dark','Solar','Lunar','Infinite','Fractal','Recursive','Broken','Twisted','Hollow','Solid'],
-    noun: ['Lands','Waves','Mountains','Valley','Spire','Grid','Matrix','Core','Void','Peaks','Dunes','Ocean','Maze','Labyrinth','Citadel','Expanse','Realm','Sector','Zone'],
+    adj: ['Cosmic','Quantum','Voxel','Hyper','Cyber','Glitch','Floating','Lost','Neon','Dark','Solar','Lunar','Infinite','Fractal','Recursive','Broken','Twisted','Hollow','Solid','Divine'],
+    noun: ['Lands','Waves','Mountains','Valley','Spire','Grid','Matrix','Core','Void','Peaks','Dunes','Ocean','Maze','Labyrinth','Citadel','Expanse','Realm','Sector','Zone','Field'],
     get: function() { return this.pick(this.adj) + ' ' + this.pick(this.noun); },
     pick: (arr) => arr[Math.floor(Math.random() * arr.length)]
 };
 
 class RandomFormula {
-    constructor() {
-        this.depth = 0;
-        this.maxDepth = 3;
-    }
-
-    rand(min, max) { return Math.random() * (max - min) + min; }
     pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
     
     getScale() {
         // Generates random coordinate scaling like x*0.1 or z*0.05
         const val = Math.random();
-        if(val < 0.3) return (Math.random()*0.05 + 0.01).toFixed(4); // Very small
-        if(val < 0.7) return (Math.random()*0.2 + 0.05).toFixed(3); // Medium
-        return (Math.random()*1.0 + 0.2).toFixed(2); // Large
+        if(val < 0.3) return (Math.random()*0.05 + 0.01).toFixed(4); 
+        if(val < 0.7) return (Math.random()*0.2 + 0.05).toFixed(3); 
+        return (Math.random()*1.0 + 0.2).toFixed(2); 
     }
 
     getCoord() {
@@ -173,32 +185,27 @@ class RandomFormula {
 
     createExpression(depth) {
         if (depth <= 0) {
-            // Terminate with simple term
             const r = Math.random();
             if(r < 0.4) return this.getCoord();
-            if(r < 0.6) return this.pick(GenOps.consts);
-            if(r < 0.8) return Math.floor(Math.random()*50).toString();
-            return `(${this.getCoord()})`; 
+            if(r < 0.5) return this.pick(GenOps.consts);
+            if(r < 0.7) return Math.floor(Math.random()*20).toString();
+            return `rand() * 10`; 
         }
 
         const r = Math.random();
         if (r < 0.25) {
-            // Binary Op
             const op = this.pick(GenOps.ops);
             return `(${this.createExpression(depth-1)} ${op} ${this.createExpression(depth-1)})`;
         } else if (r < 0.50) {
-            // Unary Func
             const func = this.pick(GenOps.unary);
             return `${func}(${this.createExpression(depth-1)})`;
         } else if (r < 0.75) {
-            // Noise Func
             const n = this.pick(GenOps.noise);
             if(n === 'octaved') {
                 return `octaved(${this.getCoord()}, ${this.getCoord()}, 4, 0.5)`;
             }
             return `${n}(${this.getCoord()}, 0, ${this.getCoord()})`;
         } else {
-            // Binary Func
             const func = this.pick(GenOps.binary);
             return `${func}(${this.createExpression(depth-1)}, ${this.createExpression(depth-1)})`;
         }
@@ -206,37 +213,29 @@ class RandomFormula {
 
     generate(type) {
         let formula = "";
-        let depth = 3;
         
         switch(type) {
             case 'HARDCODED':
-                // Simple predictable terrain
                 formula = `floor(sin(x*0.1) * cos(z*0.1) * 10)`;
                 break;
             case 'INTERMEDIATE':
-                depth = 3;
-                formula = this.createExpression(depth) + " * 10";
+                formula = this.createExpression(3) + " * 8";
                 break;
             case 'EXPERT':
-                depth = 5;
-                formula = this.createExpression(depth) + " * 20";
+                formula = `(${this.createExpression(4)} + ${this.createExpression(2)}) * 15`;
                 break;
             case 'UNREAL':
-                depth = 4;
-                // Force highly volatile functions
                 const base = this.createExpression(3);
-                formula = `mod(${base}, 20) * sin(${this.getCoord()}) * 5`;
+                formula = `mod(${base}, 20) * sin(${this.getCoord()}) * 5 + rand()*5`;
                 break;
             case 'LONG MATH':
-                // Chained operations
-                formula = `${this.createExpression(2)} + ${this.createExpression(2)} - ${this.createExpression(2)} * ${this.createExpression(1)}`;
+                formula = `${this.createExpression(2)} + ${this.createExpression(2)} - ${this.createExpression(2)}`;
                 break;
             default:
                 formula = this.createExpression(3) + " * 10";
         }
         
-        // Final cleanup
-        formula = formula.replace(/\^\^/g, '^'); // fix double operators
+        formula = formula.replace(/\^\^/g, '^'); 
         return formula;
     }
 }
@@ -251,9 +250,10 @@ const Categories = ['HARDCODED', 'INTERMEDIATE', 'EXPERT', 'UNREAL', 'LONG MATH'
 const container = document.getElementById('viewport');
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
-scene.fog = new THREE.Fog(0x87CEEB, 30, 150);
+// Fog hides the chunk boundaries
+scene.fog = new THREE.Fog(0x87CEEB, 60, 140);
 
-const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 1, 500);
+const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 1, 1000);
 const INITIAL_CAM_POS = { x: 50, y: 50, z: 50 };
 camera.position.set(INITIAL_CAM_POS.x, INITIAL_CAM_POS.y, INITIAL_CAM_POS.z);
 
@@ -267,8 +267,8 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; 
 controls.dampingFactor = 0.05; 
 controls.enableZoom = true;
-controls.minDistance = 10;
-controls.maxDistance = 200;
+controls.minDistance = 5;
+controls.maxDistance = 500;
 controls.rotateSpeed = 0.6;
 controls.autoRotate = true;
 controls.autoRotateSpeed = 0.8;
@@ -283,7 +283,6 @@ dirLight.shadow.mapSize.width = 2048;
 dirLight.shadow.mapSize.height = 2048;
 dirLight.shadow.camera.near = 0.5;
 dirLight.shadow.camera.far = 300;
-// Make shadow camera huge for infinite feel
 dirLight.shadow.camera.left = -100;
 dirLight.shadow.camera.right = 100;
 dirLight.shadow.camera.top = 100;
@@ -291,8 +290,8 @@ dirLight.shadow.camera.bottom = -100;
 scene.add(dirLight);
 
 // INFINITE VOXEL SYSTEM
-const GRID = 80; // Render distance (blocks)
-const LAYERS = 3;
+const GRID = 90; // Render distance (blocks)
+const LAYERS = 4;
 const TOTAL_INSTANCES = GRID * GRID * LAYERS;
 
 const geometry = new THREE.BoxGeometry(1, 1, 1);
@@ -305,6 +304,10 @@ const material = new THREE.MeshStandardMaterial({
 const instMesh = new THREE.InstancedMesh(geometry, material, TOTAL_INSTANCES);
 instMesh.castShadow = true;
 instMesh.receiveShadow = true;
+
+// CRITICAL FIX: Disable frustum culling so the mesh doesn't disappear when the camera moves far away
+instMesh.frustumCulled = false; 
+
 scene.add(instMesh);
 
 const dummy = new THREE.Object3D();
@@ -328,7 +331,6 @@ let compiledFunc = null;
 let lastCamX = -99999;
 let lastCamZ = -99999;
 
-// Error Handling
 const errorMsg = document.getElementById('error-msg');
 function setError(msg) {
     if(msg) {
@@ -340,7 +342,6 @@ function setError(msg) {
     }
 }
 
-// Compile Formula
 function compileFormula(str) {
     try {
         let safeStr = str.replace(/\^/g, '**');
@@ -351,6 +352,7 @@ function compileFormula(str) {
             }
         `);
         // Test it
+        Ctx._x = 0; Ctx._z = 0;
         f(Ctx, 0, 0);
         setError(null);
         return f;
@@ -360,7 +362,6 @@ function compileFormula(str) {
     }
 }
 
-// Render Logic
 function updateInfiniteTerrain() {
     if(!compiledFunc) return;
 
@@ -368,13 +369,13 @@ function updateInfiniteTerrain() {
     const cx = Math.floor(camera.position.x);
     const cz = Math.floor(camera.position.z);
 
-    // Only update if moved significantly to save FPS
-    if (Math.abs(cx - lastCamX) < 2 && Math.abs(cz - lastCamZ) < 2) return;
+    // Only update if moved 
+    if (Math.abs(cx - lastCamX) < 1 && Math.abs(cz - lastCamZ) < 1) return;
     
     lastCamX = cx;
     lastCamZ = cz;
     
-    // Light follows camera
+    // Move light with camera to maintain shadows
     dirLight.position.set(cx + 50, 100, cz + 50);
     dirLight.target.position.set(cx, 0, cz);
     dirLight.target.updateMatrixWorld();
@@ -388,15 +389,19 @@ function updateInfiniteTerrain() {
             const wx = cx - half + i;
             const wz = cz - half + j;
             
+            // Set Context Coordinates for deterministic randomness
+            Ctx._x = wx;
+            Ctx._z = wz;
+
             let y = 0;
             try { 
                 y = compiledFunc(Ctx, wx, wz); 
                 if (isNaN(y) || !isFinite(y)) y = 0;
-            } catch(e) { y = 0; } // Runtime error fallback
+            } catch(e) { y = 0; }
 
             const surfaceY = Math.floor(y);
             
-            // Biome logic based on height
+            // Biome logic
             let biomeType = 'GRASS';
             if (surfaceY < -2) biomeType = 'WATER';
             else if (surfaceY < 2) biomeType = 'SAND';
@@ -404,10 +409,9 @@ function updateInfiniteTerrain() {
             else if (surfaceY < 30) biomeType = 'STONE';
             else biomeType = 'SNOW';
             
-            // Check formula patterns for specific themes
             if (currentFormula.includes('mod') && surfaceY > 5) biomeType = 'NEON'; 
-            if (y > 60) biomeType = 'ALIEN';
-            if (y < -30) biomeType = 'LAVA';
+            if (y > 50) biomeType = 'ALIEN';
+            if (y < -25) biomeType = 'LAVA';
 
             for (let d = 0; d < LAYERS; d++) {
                 const currentY = surfaceY - d;
@@ -457,7 +461,6 @@ function updateTerrain(funcStr) {
     }
 }
 
-// Loop
 function animate() {
     requestAnimationFrame(animate);
     updateInfiniteTerrain();
@@ -492,7 +495,7 @@ const ui = {
 
 let historyList = [];
 let savedList = [];
-let currentTab = 'history'; // 'history' or 'saved'
+let currentTab = 'history'; 
 
 function generateNew() {
     Noise.seed();
@@ -512,7 +515,6 @@ function generateNew() {
 }
 
 function addToHistory(data) {
-    // Avoid duplicates at top
     if(historyList.length > 0 && historyList[0].formula === data.formula) return;
     historyList.unshift(data);
     if(historyList.length > 50) historyList.pop();
@@ -526,7 +528,6 @@ function saveCurrent() {
         noise: ui.tagNoise.textContent,
         name: ui.genName.textContent || "Custom"
     };
-    // Avoid duplicates
     if(savedList.some(i => i.formula === data.formula)) return;
     savedList.unshift(data);
     ui.toast.textContent = "SAVED!";
@@ -580,7 +581,6 @@ function renderSidebar() {
     });
 }
 
-// UI Event Listeners
 ui.input.addEventListener('input', () => {
     ui.tagGen.textContent = "CUSTOM";
     ui.tagNoise.textContent = "USER";
@@ -616,21 +616,12 @@ function showToast() {
     setTimeout(() => ui.toast.style.opacity = 0, 1500);
 }
 
-// Zoom Slider Logic
 function updateZoom() {
-    // 0% = Close (minDist), 100% = Far (maxDist)
-    // Actually, Zoom In usually means closer. 
-    // Slider Up (100) -> Zoom In (Closer/Low Distance)
-    // Slider Down (0) -> Zoom Out (Far/High Distance)
     const pct = parseInt(ui.zoomSlider.value);
-    
-    // Inverse mapping: 100% -> 10 units, 0% -> 200 units
-    const minD = 10; 
-    const maxD = 200;
+    const minD = 5; 
+    const maxD = 300;
     const targetDist = maxD - ((maxD - minD) * (pct / 100));
     
-    // We adjust orbit controls constraints temporarily to force position update
-    // Or we just move the camera along the vector to target
     const vec = new THREE.Vector3().subVectors(camera.position, controls.target);
     vec.setLength(targetDist);
     camera.position.copy(controls.target).add(vec);
@@ -647,7 +638,6 @@ ui.btnCloseHist.addEventListener('click', () => ui.sidebar.classList.remove('ope
 ui.btnGen.addEventListener('click', generateNew);
 ui.btnSave.addEventListener('click', saveCurrent);
 
-// Tab Switching
 ui.tabHistory.addEventListener('click', () => {
     currentTab = 'history';
     ui.tabHistory.classList.add('active');
@@ -668,5 +658,4 @@ window.addEventListener('resize', () => {
     renderer.setSize(container.clientWidth, container.clientHeight);
 });
 
-// Init
 generateNew();
