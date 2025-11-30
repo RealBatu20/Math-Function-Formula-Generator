@@ -78,6 +78,13 @@ body {
     color: #000;
 }
 
+/* Green Glow for Realistic Mode */
+.overlay-btn.realistic-on {
+    background: rgba(80, 250, 123, 0.2);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
 .zoom-container {
     position: absolute;
     right: 20px;
